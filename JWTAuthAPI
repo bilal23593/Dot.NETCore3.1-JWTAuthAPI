@@ -1,0 +1,64 @@
+
+
+Create model
+	==> UserModel.cs
+Create controller
+	==> LoginController.cs
+Declare IConfiguration variable
+	==> private IConfiguration _config
+Declare Constructor
+	==> public LoginController(IConfiguration config){
+		_config=config;
+	}
+Create Login fn of [HTTPGET] to get authenticate user
+	==> first declare response as unauthorized
+	==> then authenticate user credentials by matching it with DB.
+	
+Create GenerateJSONWebToken Function
+	==> Generate securityKey using SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JWTToken:Key"]) )
+	==> Generate credentials by passing securityKey and SHA256 to SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256)
+	==> Generate claims using new Claim(JwtRegisteredClaimNames.Sub , userInfo.UserName),
+                new Claim(JwtRegisteredClaimNames.Sub , userInfo.Password),
+                new Claim(JwtRegisteredClaimNames.Jti , Guid.NewGuid().ToString())
+	==> Generate token using new JwtSecurityToken(
+                issuer: _config["JWTToken:Issuer"],
+                audience: _config["JWTToken:Issuer"],
+                claims,
+                expires: DateTime.Now.AddMinutes(120),
+                signingCredentials: credentials
+                );			
+	==> Generate encodetoken using new JwtSecurityTokenHandler().WriteToken(token);
+
+Configure appsettings.json with JWTToken
+
+	"JWTToken": {
+		"Key": "programsecretkey11111111111111111111111111111111111111",
+		"Issuer": "evologyhub.com" // Issure could be any type of string 
+  }
+  
+Configure Startup.cs
+Define functions in ConfigureServices   
+
+	==> services.AddCors( options => {
+                options.AddPolicy("CorsPolicy", builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader().AllowCredentials().Build());
+            } );
+	==> services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(
+                    options =>
+                    {
+                        options.TokenValidationParameters = new TokenValidationParameters
+                        {
+                            ValidateIssuer = true,
+                            ValidateAudience = true,
+                            ValidateLifetime = true,
+                            ValidateIssuerSigningKey = true,
+                            ValidIssuer = Configuration["JWTToken:Issuer"],
+                            ValidAudience = Configuration["JWTToken:Issuer"],
+                            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Configuration["JWTToken:Key"]))
+                        };
+                    }
+                );
+    ==> services.AddMvc();
+	
+Call app.UseAuthentication(); in Configure function
+  
